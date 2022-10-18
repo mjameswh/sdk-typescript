@@ -203,6 +203,46 @@ export { api };
           __temporal_custom_failure_converter$: this.failureConverterPath ?? false,
           ...Object.fromEntries([...this.ignoreModules, ...disallowedModules].map((m) => [m, false])),
         },
+        plugins: [
+          {
+            apply(resolver) {
+              const fileHook = resolver.ensureHook('file');
+
+              resolver
+                .getHook(`before-file`)
+                .tapAsync(`UseBrowserPlatformForOpenTelemetry`, (request, stack, callback) => {
+                  if (
+                    (request.descriptionFileData as any)['name'] &&
+                    (request.descriptionFileData as any)['name'].startsWith('@opentelemetry/')
+                  ) {
+                    if (request.path && request.path.includes('/platform/node/')) {
+                      return resolver.doResolve(
+                        fileHook,
+                        { ...request, path: request.path.replace('/platform/node/', '/platform/browser/') },
+                        null,
+                        {},
+                        callback
+                      );
+                    }
+                    if (request.relativePath && request.relativePath.includes('/platform/node/')) {
+                      return resolver.doResolve(
+                        fileHook,
+                        {
+                          ...request,
+                          relativePath: request.relativePath.replace('/platform/node/', '/platform/browser/'),
+                        },
+                        null,
+                        {},
+                        callback
+                      );
+                    }
+                  }
+
+                  return callback();
+                });
+            },
+          },
+        ],
       },
       externals: captureProblematicModules,
       module: {
@@ -234,11 +274,33 @@ export { api };
       entry: [entry],
       mode: 'development',
       devtool: 'inline-source-map',
+      target: false,
       output: {
         path: distDir,
         filename: 'workflow-bundle-[fullhash].js',
         devtoolModuleFilenameTemplate: '[absolute-resource-path]',
         library: '__TEMPORAL__',
+        chunkFormat: 'array-push',
+        environment: {
+          // The environment supports arrow functions ('() => { ... }').
+          arrowFunction: true,
+          // The environment supports BigInt as literal (123n).
+          bigIntLiteral: false,
+          // The environment supports const and let for variable declarations.
+          const: true,
+          // The environment supports destructuring ('{ a, b } = obj').
+          destructuring: true,
+          // The environment supports an async import() function to import EcmaScript modules.
+          dynamicImport: false,
+          // The environment supports 'for of' iteration ('for (const x of array) { ... }').
+          forOf: true,
+          // The environment supports ECMAScript Module syntax to import ECMAScript modules (import ... from '...').
+          module: false,
+          // The environment supports optional chaining ('obj?.a' or 'obj?.()').
+          optionalChaining: true,
+          // The environment supports template literals.
+          templateLiteral: true,
+        },
       },
       ignoreWarnings: [/Failed to parse source map/],
     };
