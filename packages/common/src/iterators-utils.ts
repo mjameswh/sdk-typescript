@@ -1,4 +1,5 @@
 import { EventEmitter, on, once } from 'node:events';
+import { CountingSemaphore } from './concurrency-primitives';
 
 export interface MapAsyncOptions {
   /**
@@ -58,27 +59,7 @@ export async function* mapAsyncIterable<A, B>(
   const emitterError: Promise<unknown[]> = once(emitter, 'error');
 
   const bufferLimitSemaphore =
-    typeof bufferLimit === 'number'
-      ? (() => {
-          const releaseEvents: AsyncIterator<void> = toAsyncIterator(
-            on(emitter, 'released', { signal: controller.signal })
-          );
-          let value = bufferLimit + concurrency;
-
-          return {
-            acquire: async () => {
-              while (value <= 0) {
-                await Promise.race([releaseEvents.next(), emitterError]);
-              }
-              value--;
-            },
-            release: () => {
-              value++;
-              emitter.emit('released');
-            },
-          };
-        })()
-      : undefined;
+    typeof bufferLimit === 'number' ? new CountingSemaphore(bufferLimit + concurrency) : undefined;
 
   const mapper = async () => {
     for (;;) {

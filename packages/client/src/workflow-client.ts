@@ -67,7 +67,7 @@ import {
   LoadedWithDefaults,
   WithDefaults,
 } from './base-client';
-import { mapAsyncIterable } from './iterators-utils';
+import { mapAsyncIterable } from '@temporalio/common/src/iterators-utils';
 
 /**
  * A client side handle to a single Workflow instance.
