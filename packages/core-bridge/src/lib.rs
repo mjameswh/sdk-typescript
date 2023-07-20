@@ -1,6 +1,7 @@
 mod conversions;
 mod errors;
 mod helpers;
+mod metrics_exporter;
 mod runtime;
 mod testing;
 mod worker;

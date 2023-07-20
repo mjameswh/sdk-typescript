@@ -1,4 +1,4 @@
-use crate::helpers::*;
+use crate::{helpers::*, metrics_exporter::TypeScriptMetricsExporter};
 use neon::{
     context::Context,
     handle::Handle,
@@ -6,7 +6,7 @@ use neon::{
     types::{JsBoolean, JsNumber, JsString},
 };
 use opentelemetry::trace::{SpanContext, SpanId, TraceFlags, TraceId, TraceState};
-use std::{collections::HashMap, net::SocketAddr, str::FromStr, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, str::FromStr, time::Duration, sync::Arc};
 use temporal_sdk_core::{
     api::telemetry::{
         Logger, MetricTemporality, MetricsExporter, OtelCollectorOptions, TelemetryOptions,
@@ -243,6 +243,10 @@ impl ObjectHandleConversionsExt for Handle<'_, JsObject> {
                     headers,
                     metric_periodicity,
                 }));
+            } else if let Some(ref forward) = js_optional_getter!(cx, metrics, "forward", JsObject) {
+                telemetry_opts.metrics(MetricsExporter::Lang(
+                    Arc::new(TypeScriptMetricsExporter {})
+                ));
             } else {
                 cx.throw_type_error(
                     "Invalid telemetryOptions.metrics, missing `prometheus` or `otel` option",
