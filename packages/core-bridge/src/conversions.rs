@@ -243,13 +243,15 @@ impl ObjectHandleConversionsExt for Handle<'_, JsObject> {
                     headers,
                     metric_periodicity,
                 }));
-            } else if let Some(ref forward) = js_optional_getter!(cx, metrics, "forward", JsObject) {
+            } else if let Some(ref _forward) = js_optional_getter!(cx, metrics, "forward", JsObject) {
                 telemetry_opts.metrics(MetricsExporter::Lang(
-                    Arc::new(TypeScriptMetricsExporter {})
+                    Arc::new(TypeScriptMetricsExporter::new(
+                        // TODO: Pass a metric initializer function to TypeScriptMetricsExporter
+                    ))
                 ));
             } else {
                 cx.throw_type_error(
-                    "Invalid telemetryOptions.metrics, missing `prometheus` or `otel` option",
+                    "Invalid telemetryOptions.metrics, missing `prometheus`, `otel` or `forward` option",
                 )?
             }
         }

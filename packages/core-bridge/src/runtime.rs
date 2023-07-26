@@ -94,6 +94,11 @@ pub enum RuntimeRequest {
         /// Logs are sent to this function
         callback: Root<JsFunction>,
     },
+    /// A request to drain metric events from core so they can be emitted in node
+    PollMetricEvents {
+        /// Metrics are sent to this function
+        callback: Root<JsFunction>,
+    },
     StartEphemeralServer {
         runtime: Arc<RuntimeHandle>,
         config: EphemeralServerConfig,
@@ -208,6 +213,9 @@ pub fn start_bridge_loop(
                         }
                         Ok(logarr)
                     });
+                }
+                RuntimeRequest::PollMetricEvents { callback } => {
+
                 }
                 RuntimeRequest::InitWorker {
                     config,
@@ -392,6 +400,19 @@ pub fn runtime_shutdown(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 /// Request to drain forwarded logs from core
 pub fn poll_logs(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let runtime = cx.argument::<BoxedRuntime>(0)?;
+    let callback = cx.argument::<JsFunction>(1)?;
+    let request = RuntimeRequest::PollLogs {
+        callback: callback.root(&mut cx),
+    };
+    if let Err(err) = runtime.sender.send(request) {
+        callback_with_unexpected_error(&mut cx, callback, err)?;
+    }
+    Ok(cx.undefined())
+}
+
+/// Request to drain forwarded metrics events from core
+pub fn poll_metrics_events(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let runtime = cx.argument::<BoxedRuntime>(0)?;
     let callback = cx.argument::<JsFunction>(1)?;
     let request = RuntimeRequest::PollLogs {

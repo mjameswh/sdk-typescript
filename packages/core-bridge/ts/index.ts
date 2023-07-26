@@ -150,6 +150,17 @@ export interface PrometheusMetricsExporter {
 }
 
 /**
+ * Forward metrics to a JavaScript-land metrics exporter
+ *
+ * @experimental
+ */
+export interface ForwardMetricsExporter {
+  forward: {
+    bindAddress: string;
+  };
+}
+
+/**
  * Metrics exporters supported by Core
  *
  * `temporality` is the type of aggregation temporality for metric export. Applies to both Prometheus and OpenTelemetry exporters.
