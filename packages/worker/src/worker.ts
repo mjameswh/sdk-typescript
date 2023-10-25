@@ -401,10 +401,6 @@ export class Worker {
   protected static nativeWorkerCtor: WorkerConstructor = NativeWorker;
   // Used to add uniqueness to replay worker task queue names
   protected static replayWorkerCount = 0;
-  private static readonly SELF_INDUCED_SHUTDOWN_EVICTION: RemoveFromCache = {
-    message: 'Shutting down',
-    reason: EvictionReason.FATAL,
-  };
   protected readonly workflowCodecRunner: WorkflowCodecRunner;
 
   /**
@@ -1008,31 +1004,14 @@ export class Worker {
     return pipe(
       closeableGroupBy((activation) => activation.runId),
       mergeMap((group$) => {
-        return merge(
-          group$.pipe(map((activation) => ({ activation, synthetic: false }))),
-          this.workflowPollerStateSubject.pipe(
-            // Core has indicated that it will not return any more poll results, evict all cached WFs
-            filter((state) => state !== 'POLLING'),
-            first(),
-            map((): { activation: coresdk.workflow_activation.WorkflowActivation; synthetic: true } => {
-              return {
-                activation: coresdk.workflow_activation.WorkflowActivation.create({
-                  runId: group$.key,
-                  jobs: [{ removeFromCache: Worker.SELF_INDUCED_SHUTDOWN_EVICTION }],
-                }),
-                synthetic: true,
-              };
-            }),
-            takeUntil(group$.pipe(last(undefined, null)))
-          )
-        ).pipe(
+        return group$.pipe(
           tap(() => {
             this.numInFlightActivationsSubject.next(this.numInFlightActivationsSubject.value + 1);
           }),
           mergeMapWithState(
             async (
               state: WorkflowWithLogAttributes | undefined,
-              { activation, synthetic }
+              activation
             ): Promise<{
               state: WorkflowWithLogAttributes | undefined;
               output: { completion?: Uint8Array; close: boolean };
@@ -1059,12 +1038,10 @@ export class Worker {
                   if (!close) {
                     throw new IllegalStateError('Got a Workflow activation with no jobs');
                   }
-                  const completion = synthetic
-                    ? undefined
-                    : coresdk.workflow_completion.WorkflowActivationCompletion.encodeDelimited({
-                        runId: activation.runId,
-                        successful: {},
-                      }).finish();
+                  const completion = coresdk.workflow_completion.WorkflowActivationCompletion.encodeDelimited({
+                    runId: activation.runId,
+                    successful: {},
+                  }).finish();
                   return { state: undefined, output: { close, completion } };
                 }
 
