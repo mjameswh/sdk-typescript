@@ -487,9 +487,7 @@ export interface WorkerOptions {
    * From running basic stress tests we've observed 2/3 reduction in memory usage and 1/3 to 1/2 in CPU usage with this
    * feature turned on.
    *
-   * Note that we plan to turn this option on by default starting with 1.9.0.
-   *
-   * @default false (will change in the future)
+   * @default true
    */
   reuseV8Context?: boolean;
 
