@@ -2,6 +2,7 @@ import {
   ActivityFunction,
   ActivityOptions,
   compileRetryPolicy,
+  encodeWorkflowIdReusePolicy,
   extractWorkflowType,
   HandlerUnfinishedPolicy,
   LocalActivityOptions,
@@ -373,7 +374,7 @@ function startChildWorkflowExecutionNextHandler({
         namespace: activator.info.namespace, // Not configurable
         headers,
         cancellationType: options.cancellationType,
-        workflowIdReusePolicy: options.workflowIdReusePolicy,
+        workflowIdReusePolicy: encodeWorkflowIdReusePolicy(options.workflowIdReusePolicy),
         parentClosePolicy: options.parentClosePolicy,
         cronSchedule: options.cronSchedule,
         searchAttributes: options.searchAttributes
