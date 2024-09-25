@@ -21,7 +21,7 @@ export type CheckConstEnum<
   PREFIX extends string,
   TS_KEYS_ALL extends string,
   TS_KEYS extends TS_KEYS_ALL,
-  TS_TYPE extends { [k in TS_KEYS_ALL]: TS_KEYS } & { [k in `${PREFIX}UNSPECIFIED`]: undefined },
+  TS_TYPE extends { [k in TS_KEYS_ALL]: TS_KEYS },
   PROTO_KEYS extends `${PREFIX}${TS_KEYS}`,
   PROTO_TYPE extends { [k in `${PREFIX}${TS_KEYS}`]: number },
   TS_TO_PROTO_MAP extends { [k in TS_KEYS]: PROTO_TYPE[PROTO_KEYS] },
