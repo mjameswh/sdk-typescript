@@ -6,9 +6,15 @@ use neon::{
     types::{JsBoolean, JsNumber, JsString},
 };
 use slot_supplier_bridge::SlotSupplierBridge;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration,
+};
 use temporal_client::HttpConnectProxyOptions;
 use temporal_sdk_core::api::{
+    errors::WorkflowErrorType,
     telemetry::{HistogramBucketOverrides, OtlpProtocol},
     worker::SlotKind,
 };
@@ -517,6 +523,25 @@ impl ObjectHandleConversionsExt for Handle<'_, JsObject> {
             return cx.throw_error("Missing tuner");
         };
 
+        let workflow_failure_errors =
+            if js_value_getter!(cx, self, "nondeterminismAsWorkflowFail", JsBoolean) {
+                HashSet::from([WorkflowErrorType::Nondeterminism])
+            } else {
+                HashSet::new()
+            };
+
+        let non_determinism_as_workflow_fail_for_types =
+            js_getter!(cx, self, "noneterminismAsWorkflowFailForTypes", JsArray)
+                .to_vec_of_string(cx)?
+                .iter()
+                .map(|s| {
+                    (
+                        s.to_owned(),
+                        HashSet::from([WorkflowErrorType::Nondeterminism]),
+                    )
+                })
+                .collect::<HashMap<String, HashSet<WorkflowErrorType>>>();
+
         match WorkerConfigBuilder::default()
             .worker_build_id(js_value_getter!(cx, self, "buildId", JsString))
             .client_identity_override(Some(js_value_getter!(cx, self, "identity", JsString)))
@@ -535,6 +560,8 @@ impl ObjectHandleConversionsExt for Handle<'_, JsObject> {
             .default_heartbeat_throttle_interval(default_heartbeat_throttle_interval)
             .max_worker_activities_per_second(max_worker_activities_per_second)
             .max_task_queue_activities_per_second(max_task_queue_activities_per_second)
+            .workflow_failure_errors(workflow_failure_errors)
+            .workflow_types_to_failure_errors(non_determinism_as_workflow_fail_for_types)
             .build()
         {
             Ok(worker_cfg) => Ok(worker_cfg),

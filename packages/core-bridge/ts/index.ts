@@ -389,6 +389,8 @@ export interface WorkerOptions {
   maxTaskQueueActivitiesPerSecond?: number;
   maxActivitiesPerSecond?: number;
   shutdownGraceTimeMs: number;
+  nondeterminismAsWorkflowFail: boolean;
+  nondeterminismAsWorkflowFailForTypes: string[];
 }
 
 export type LogEntryMetadata = {

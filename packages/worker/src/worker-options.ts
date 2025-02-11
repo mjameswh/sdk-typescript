@@ -482,6 +482,23 @@ export interface WorkerOptions {
   sinks?: InjectedSinks<any>;
 
   /**
+   * The types of exceptions that, if a Workflow-thrown error extends, will cause the Workflow
+   * Execution or the Update to fail instead of suspending the Workflow via task failure.
+   *
+   * This property expects a record of Workflow-type names to the list of error types that will
+   * cause that type of Workflow to fail. Uses the `'*'` key to specify a list of error types that
+   * applies to all Workflow types.
+   *
+   * If either list of error types includes `NondeterminismError`, then non-determinism errors
+   * will cause the Workflow Excution to fail. If the list of error types includes `Error`, it
+   * effectively will fail a workflow/update in all user exception cases, including non-determinism
+   * errors.
+   *
+   * @experimental
+   */
+  workflowTypesToFailureErrors?: Record<'*' | string, string[]>;
+
+  /**
    * @deprecated SDK tracing is no longer supported. This option is ignored.
    */
   enableSDKTracing?: boolean;
@@ -592,6 +609,9 @@ export interface CompiledWorkerOptions
   loadedDataConverter: LoadedDataConverter;
   activities: Map<string, ActivityFunction>;
   tuner: NativeWorkerTuner;
+  workflowTypesToFailureErrors: Record<'*' | string, string[]>;
+  nondeterminismAsWorkflowFail: boolean;
+  nondeterminismAsWorkflowFailForTypes: string[];
 }
 
 export type CompiledWorkerOptionsWithBuildId = CompiledWorkerOptions & {
@@ -837,6 +857,11 @@ export function compileWorkerOptions(rawOpts: WorkerOptions, logger: Logger): Co
     activities,
     enableNonLocalActivities: opts.enableNonLocalActivities && activities.size > 0,
     tuner,
+    nondeterminismAsWorkflowFail:
+      opts.workflowTypesToFailureErrors?.['*']?.includes('NondeterminismError') ||
+      opts.workflowTypesToFailureErrors?.['*']?.includes('Error') ||
+      false,
+    nondeterminismAsWorkflowFailForTypes: [], // FIXME opts.nondeterminismAsWorkflowFailForTypes,
   };
 }
 
