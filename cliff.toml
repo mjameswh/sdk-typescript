@@ -1,61 +1,161 @@
-# configuration file for git-cliff (0.1.0)
-
-# !!! IMPORTANT !!!
-# This config is still incomplete, please review output and edit manually.
-# PR links should be turned into links manually.
-# With vim use
-# :s/\v#(\d+)/[#\1](https:\/\/github.com\/temporalio\/sdk-typescript\/pull\/\1)
-#
-# breaking_description isn't rendedered properly
-
-
 [changelog]
-# changelog header
-# header = """
-# # Changelog
-# All notable changes to this project will be documented in this file.\n
 
-# Breaking changes marked with a :boom:
-# """
-# template for the changelog body
-# https://tera.netlify.app/docs/#introduction
+header = ""
+
+# Body is rendered once for each release.
 body = """
 {% if version %}\
     ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else %}\
     ## [unreleased]
 {% endif %}\
+
 {% for group, commits in commits | group_by(attribute="group") %}
-    ### {{ group | upper_first }}
+    ### {{ group | striptags | trim | upper_first }}
     {% for commit in commits %}
         - {% if commit.breaking %}:boom: {% endif %}{% if commit.scope %}[`{{ commit.scope }}`] {% endif %}\
         {{ commit.message | upper_first }}\
     {% endfor %}
 {% endfor %}\n
+
+{% for submodule_path, commits in submodule_commits %}
+    {% if submodule_path == "packages/core-bridge/sdk-core" %}
+        ## Core SDK
+    {% else %}
+        ## {{ submodule_path | upper_first }}
+    {% endif %}
+
+    {% for group, commits in commits | group_by(attribute="group") %}
+        ### {{ group | striptags | trim | upper_first }}
+        {% for commit in commits %}
+            - {{ commit.message | upper_first }}\
+        {% endfor %}
+    {% endfor %}
+{% endfor %}\n
+
+{%- if github -%}
+{% if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}
+  {% raw %}\n{% endraw -%}
+  ## New Contributors
+{%- endif %}\
+{% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
+  * @{{ contributor.username }} made their first contribution
+    {%- if contributor.pr_number %} in \
+      [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}) \
+    {%- endif %}
+{%- endfor -%}
+{%- endif -%}
+
+{% if version %}
+    {% if previous.version %}
+      **Full Changelog**: {{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }}
+    {% endif %}
+{% else -%}
+  {% raw %}\n{% endraw %}
+{% endif %}
+
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
 """
-# remove the leading and trailing whitespaces from the template
+
+footer = """
+_Breaking changes are marked with :boom:_
+_Experimental features are marked with :test_tube:_
+"""
+
 trim = true
 
+
 [git]
-# allow only conventional commits
-# https://www.conventionalcommits.org
+
+# Extract details from commit messages that follow the Conventional Commits syntax
+# (https://www.conventionalcommits.org), but do not discard commits that don't.
+#
+# For example:
+#   - `feat(client): add new method to client`
+#   - `fix(worker)!: this is a breaking change`
+
 conventional_commits = true
-# regex for parsing and grouping commits
-commit_parsers = [
-    { message = "^feat", group = "Features"},
-    { message = "^fix", group = "Bug Fixes"},
-    { message = "^doc", group = "Documentation"},
-    { message = "^perf", group = "Performance"},
-    { message = "^refactor", group = "Refactor"},
-    { message = "^style", group = "Styling"},
-    { message = "^test", group = "Testing"},
-    { message = "^chore\\(release\\): prepare for", skip = true},
-    { message = "^chore", group = "Miscellaneous Tasks"},
-    { body = ".*security", group = "Security"},
+filter_unconventional = false
+require_conventional = false
+
+
+# Include changes from Core SDK
+
+recurse_submodules = true
+
+
+# Exclude commits that _only_ affect some specific paths
+
+exclude_paths = [
+    ".github/",
+    "packages/core-bridge/sdk-core",
+    "packages/docs/",
+    "docs/",
+    "CONTRIBUTING.md",
+    "pnpm-lock.yaml",
+    "package-lock.json",
 ]
-# filter out the commits that are not matched by commit parsers
+
+
+commit_preprocessors = [
+    # otel -> OpenTelemetry
+    { pattern = "\\b([Oo][Tt][Ee][Ll])\\b", replace = "OpenTelemetry" },
+
+    # TODO: Figure out to set correct repo (e.g. sdk-core vs sdk-typescript)
+    { pattern = "[(]?#(\\d+)[)]?", replace = "([#$1](https://github.com/temporalio/sdk-typescript/pull/$1))" },
+
+    { pattern = "\nCo-authored-by: (.*) <(.*)>", replace = "" },
+]
+
+# regex for parsing and grouping commits. Rules are applied in order, stopping at the first match.
+commit_parsers = [
+    # Ignore commits that are part of the release process
+    { message = "chore[(]release[)]: Publish", skip = true },
+
+    { field = "github.pr_labels", pattern = "skip-release-notes", skip = true },
+
+    # Group commits will be sorted by alphabetical order. The leading HTML comment allows us to
+    # force a specific order. The tag will be stripped on output using the `striptags` filter.
+    { message = "^feat", group = "<!--01--> Features"},
+    { message = "^fix", group = "<!--02--> Bug Fixes"},
+    { message = "^doc", group = "<!--03--> Documentation"},
+    { message = "^perf", group = "<!--04--> Performance"},
+    { message = "^refactor", group = "<!--05--> Refactor"},
+    { message = "^style", group = "<!--06--> Styling"},
+    { message = "^test", group = "<!--07--> Testing"},
+    
+    { body = ".*security", group = "<!--08--> Security"},
+    { field = "author.name", pattern = "dependabot[bot]", group = "<!--08--> Security"},
+    { message = "vuln.* dep.*", group = "<!--08--> Security"},
+
+    
+
+    # These needs to be sorted manually.
+    { message = "^chore", group = "<!--99--> Other"},
+    { message = ".*", group = "<!--99--> Other"},
+]
+
+# Do not filter out commits that are not matched by commit parsers
 filter_commits = false
+
 # glob pattern for matching git tags
-tag_pattern = "v[0-9]*"
+tag_pattern = "^v[0-9]+[.][0-9]+[.][0-9]+.*$"
+
 # regex for skipping tags
-skip_tags = "v0.1.0-beta.1"
+ignore_tags = "v0.1.0-beta.1"
+
+# Not sure if we'll want to keep this enabled, but it's helpful while building the initial config
+fail_on_unmatched_commit = true
+
+# Sort tags in topological order (i.e. by increasing version numbers,
+# rather than the date the releases were published).
+topo_order = true
+
+# Sort commits inside sections, with newest commits first.
+sort_commits = "newest"
+
+[remote.github]
+owner = "temporalio"
+repo = "sdk-typescript"
